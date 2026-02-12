@@ -1,27 +1,69 @@
 # Joplin Remote MCP server for LLM integration
 
-This project is a server that allows you to interact with your Joplin notes remotely using the Joplin API. It is designed to be used with the MCP (Model Context Protocol) for LLM (Language Model) integration, allowing you to access and manipulate your Joplin notes through natural language commands.
+This project provides a Streamable HTTP MCP server over the Joplin Data API (Web Clipper).
+It enables MCP clients (including coding agents/LLMs) to read and manage notes, folders,
+tags, search, and attachments.
 
 ## Features
 
-- Remote access to Joplin notes via API
-- Create/move/delete Joplin folders (notebooks)
-- Manage attachments (resources): list/get/create/delete and attach to notes
-- Integration with MCP for LLM interaction
-- Secure authentication using Joplin API token
-- Easy setup and configuration
+- Remote Joplin access via MCP Streamable HTTP
+- API-key protected MCP endpoint (`X-API-Key`)
+- Notes CRUD
+- Folder (notebook) list/tree/create/update/delete
+- Tag list/create/delete + attach/remove tag on note
+- Search across Joplin items
+- Attachment/resource support:
+   - list/get/create/delete resources
+   - list note resources
+   - attach/detach resource links in note bodies
 
-## Notes
+## Runtime endpoints
 
-- Ensure you have the Joplin API enabled and a valid API token before using this server.
-- This server is intended for use in a secure environment, as it allows remote access to your Joplin notes. Always keep your API token secure and do not expose it publicly.
-- The server is designed to be used with LLMs, so it may not have a traditional user interface. It is meant to be accessed programmatically through the MCP protocol.
+- MCP endpoint: `http://$MCP_HOST:$MCP_PORT/mcp`
+- Health endpoint: `GET /health` (intentionally unauthenticated)
+
+All MCP requests must include:
+
+- `X-API-Key: $MCP_API_KEY`
+
+## Exposed MCP resources
+
+- `joplin-note://{note_id}`
+- `joplin-folders://tree`
+
+## Exposed MCP tools
+
+- Notes:
+   - `notes_get`
+   - `notes_list`
+   - `notes_create`
+   - `notes_update`
+   - `notes_delete`
+- Folders:
+   - `folders_list`
+   - `folders_tree`
+   - `folders_create`
+   - `folders_update`
+   - `folders_delete`
+- Tags:
+   - `tags_list`
+   - `tags_create`
+   - `tags_delete`
+   - `tags_add_note`
+   - `tags_remove_note`
+- Resources (attachments):
+   - `resources_list`
+   - `resources_get`
+   - `resources_get_content`
+   - `resources_create`
+   - `resources_delete`
+   - `notes_list_resources`
+   - `notes_attach_resource`
+   - `notes_detach_resource`
+- Search:
+   - `search`
 
 ## Installation
-
-This project uses Streamable HTTP transport (recommended) and runs an MCP endpoint at:
-
-- http://$MCP_HOST:$MCP_PORT/mcp
 
 ### Setup (uv)
 
@@ -40,9 +82,12 @@ This project uses Streamable HTTP transport (recommended) and runs an MCP endpoi
 
 - uv run mcp-joplin-streamable-sse
 
-The server is protected by an X-API-Key header. Your MCP client must send:
+## Development
 
-- X-API-Key: $MCP_API_KEY
+- Install (with dev extras):
+   - `uv sync --all-extras`
+- Run tests:
+   - `uv run python -m pytest -q`
 
 ## References
 
