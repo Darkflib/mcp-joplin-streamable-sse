@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import base64
+import binascii
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
@@ -10,7 +12,7 @@ from typing import Any
 from mcp.server.fastmcp import Context, FastMCP
 
 from .joplin_client import JoplinClient
-from .models import Folder, FolderNode, Note, PagedResult
+from .models import Folder, FolderNode, Note, PagedResult, Resource, ResourceBlob
 from .settings import Settings
 
 
@@ -288,6 +290,159 @@ def create_mcp_server(settings: Settings) -> FastMCP:
         app: AppContext = ctx.request_context.lifespan_context
         await app.joplin.request_json("DELETE", f"/tags/{tag_id}/notes/{note_id}")
         return {"tag_id": tag_id, "note_id": note_id, "attached": False}
+
+    @mcp.tool()
+    async def resources_list(
+        ctx: Context,
+        page: int = 1,
+        limit: int = 50,
+        fields: str = "id,title,mime,filename,file_extension,size,updated_time",
+    ) -> PagedResult:
+        """List attachments (resources)."""
+        app: AppContext = ctx.request_context.lifespan_context
+        params: dict[str, Any] = {}
+        parsed_fields = _parse_fields(fields)
+        if parsed_fields:
+            params["fields"] = parsed_fields
+        raw = await app.joplin.get_paged("/resources", page=page, limit=limit, params=params)
+        return _paged_result(raw, page=page, limit=limit)
+
+    @mcp.tool()
+    async def resources_get(resource_id: str, ctx: Context) -> Resource:
+        """Get a single attachment metadata by id."""
+        app: AppContext = ctx.request_context.lifespan_context
+        raw = await app.joplin.request_json(
+            "GET",
+            f"/resources/{resource_id}",
+            params={
+                "fields": "id,title,mime,filename,file_extension,size,created_time,updated_time"
+            },
+        )
+        return Resource.model_validate(raw)
+
+    @mcp.tool()
+    async def resources_get_content(resource_id: str, ctx: Context) -> ResourceBlob:
+        """Get attachment file bytes encoded as base64."""
+        app: AppContext = ctx.request_context.lifespan_context
+        meta_raw = await app.joplin.request_json(
+            "GET",
+            f"/resources/{resource_id}",
+            params={"fields": "id,mime,filename,size"},
+        )
+        data, _headers = await app.joplin.request_bytes("GET", f"/resources/{resource_id}/file")
+        return ResourceBlob(
+            id=resource_id,
+            mime=meta_raw.get("mime"),
+            filename=meta_raw.get("filename"),
+            size=len(data),
+            data_base64=base64.b64encode(data).decode("ascii"),
+        )
+
+    @mcp.tool()
+    async def resources_create(
+        filename: str,
+        data_base64: str,
+        ctx: Context,
+        mime: str = "application/octet-stream",
+        title: str | None = None,
+    ) -> Resource:
+        """Create a new attachment (resource) from base64-encoded file bytes."""
+        app: AppContext = ctx.request_context.lifespan_context
+        try:
+            raw_bytes = base64.b64decode(data_base64, validate=True)
+        except binascii.Error as exc:
+            raise ValueError("Invalid base64 data in 'data_base64'") from exc
+
+        raw = await app.joplin.create_resource(
+            filename=filename,
+            data=raw_bytes,
+            mime=mime,
+            title=title,
+        )
+        return Resource.model_validate(raw)
+
+    @mcp.tool()
+    async def resources_delete(resource_id: str, ctx: Context) -> dict[str, Any]:
+        """Delete an attachment (resource)."""
+        app: AppContext = ctx.request_context.lifespan_context
+        await app.joplin.request_json("DELETE", f"/resources/{resource_id}")
+        return {"deleted": True, "id": resource_id}
+
+    @mcp.tool()
+    async def notes_list_resources(
+        note_id: str,
+        ctx: Context,
+        page: int = 1,
+        limit: int = 50,
+        fields: str = "id,title,mime,filename,file_extension,size,updated_time",
+    ) -> PagedResult:
+        """List attachments linked to a note."""
+        app: AppContext = ctx.request_context.lifespan_context
+        params: dict[str, Any] = {}
+        parsed_fields = _parse_fields(fields)
+        if parsed_fields:
+            params["fields"] = parsed_fields
+        raw = await app.joplin.get_paged(
+            f"/notes/{note_id}/resources", page=page, limit=limit, params=params
+        )
+        return _paged_result(raw, page=page, limit=limit)
+
+    @mcp.tool()
+    async def notes_attach_resource(
+        note_id: str,
+        resource_id: str,
+        ctx: Context,
+        alt_text: str | None = None,
+        embed: bool = False,
+    ) -> Note:
+        """Attach a resource to a note by appending a Markdown resource link."""
+        app: AppContext = ctx.request_context.lifespan_context
+        note_raw = await app.joplin.request_json(
+            "GET",
+            f"/notes/{note_id}",
+            params={"fields": "id,title,body,parent_id,created_time,updated_time"},
+        )
+        body = note_raw.get("body") or ""
+        display = alt_text or resource_id
+        snippet = f"![{display}](:/{resource_id})" if embed else f"[{display}](:/{resource_id})"
+        if snippet not in body:
+            body = f"{body.rstrip()}\n\n{snippet}\n"
+
+        updated_raw = await app.joplin.request_json(
+            "PUT",
+            f"/notes/{note_id}",
+            json_body={"body": body},
+        )
+        return Note.model_validate(updated_raw)
+
+    @mcp.tool()
+    async def notes_detach_resource(
+        note_id: str,
+        resource_id: str,
+        ctx: Context,
+    ) -> Note:
+        """Detach a resource from a note by removing Markdown resource links that reference it."""
+        app: AppContext = ctx.request_context.lifespan_context
+        note_raw = await app.joplin.request_json(
+            "GET",
+            f"/notes/{note_id}",
+            params={"fields": "id,title,body,parent_id,created_time,updated_time"},
+        )
+        body = note_raw.get("body") or ""
+        filtered_lines: list[str] = []
+        needle = f"(:/{resource_id})"
+        for line in body.splitlines():
+            if needle in line:
+                continue
+            filtered_lines.append(line)
+        updated_body = "\n".join(filtered_lines).rstrip() + "\n"
+
+        updated_raw = await app.joplin.request_json(
+            "PUT",
+            f"/notes/{note_id}",
+            json_body={"body": updated_body},
+        )
+        return Note.model_validate(updated_raw)
 
     @mcp.tool()
     async def search(

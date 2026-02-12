@@ -37,6 +37,25 @@ class Tag(BaseModel):
     title: str | None = None
 
 
+class Resource(BaseModel):
+    id: str
+    title: str | None = None
+    mime: str | None = None
+    filename: str | None = None
+    file_extension: str | None = None
+    size: int | None = None
+    created_time: int | None = None
+    updated_time: int | None = None
+
+
+class ResourceBlob(BaseModel):
+    id: str
+    mime: str | None = None
+    filename: str | None = None
+    size: int
+    data_base64: str
+
+
 class FolderNode(BaseModel):
     id: str
     title: str | None = None
