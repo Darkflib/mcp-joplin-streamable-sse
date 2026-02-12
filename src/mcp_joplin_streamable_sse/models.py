@@ -28,6 +28,8 @@ class Folder(BaseModel):
     id: str
     title: str | None = None
     parent_id: str | None = None
+    created_time: int | None = None
+    updated_time: int | None = None
 
 
 class Tag(BaseModel):

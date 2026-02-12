@@ -10,7 +10,7 @@ from typing import Any
 from mcp.server.fastmcp import Context, FastMCP
 
 from .joplin_client import JoplinClient
-from .models import FolderNode, Note, PagedResult
+from .models import Folder, FolderNode, Note, PagedResult
 from .settings import Settings
 
 
@@ -195,6 +195,46 @@ def create_mcp_server(settings: Settings) -> FastMCP:
             params["fields"] = parsed_fields
         raw = await app.joplin.get_paged("/folders", page=page, limit=limit, params=params)
         return _paged_result(raw, page=page, limit=limit)
+
+    @mcp.tool()
+    async def folders_create(
+        title: str,
+        ctx: Context,
+        parent_id: str | None = None,
+    ) -> Folder:
+        """Create a new folder (notebook)."""
+        app: AppContext = ctx.request_context.lifespan_context
+        payload: dict[str, Any] = {"title": title}
+        if parent_id:
+            payload["parent_id"] = parent_id
+        raw = await app.joplin.request_json("POST", "/folders", json_body=payload)
+        return Folder.model_validate(raw)
+
+    @mcp.tool()
+    async def folders_update(
+        folder_id: str,
+        ctx: Context,
+        title: str | None = None,
+        parent_id: str | None = None,
+    ) -> Folder:
+        """Update a folder (rename and/or move by changing parent_id)."""
+        app: AppContext = ctx.request_context.lifespan_context
+        payload: dict[str, Any] = {}
+        if title is not None:
+            payload["title"] = title
+        if parent_id is not None:
+            payload["parent_id"] = parent_id
+        if not payload:
+            raise ValueError("At least one of 'title' or 'parent_id' must be provided")
+        raw = await app.joplin.request_json("PUT", f"/folders/{folder_id}", json_body=payload)
+        return Folder.model_validate(raw)
+
+    @mcp.tool()
+    async def folders_delete(folder_id: str, ctx: Context) -> dict[str, Any]:
+        """Delete a folder (notebook)."""
+        app: AppContext = ctx.request_context.lifespan_context
+        await app.joplin.request_json("DELETE", f"/folders/{folder_id}")
+        return {"deleted": True, "id": folder_id}
 
     @mcp.tool()
     async def folders_tree(ctx: Context) -> list[FolderNode]:

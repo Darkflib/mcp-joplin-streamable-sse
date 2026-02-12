@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from mcp_joplin_sse.settings import Settings
+from mcp_joplin_streamable_sse.settings import Settings
 
 
 def test_settings_load_from_env(monkeypatch) -> None:

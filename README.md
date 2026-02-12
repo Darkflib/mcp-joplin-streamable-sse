@@ -5,6 +5,7 @@ This project is a server that allows you to interact with your Joplin notes remo
 ## Features
 
 - Remote access to Joplin notes via API
+- Create/move/delete Joplin folders (notebooks)
 - Integration with MCP for LLM interaction
 - Secure authentication using Joplin API token
 - Easy setup and configuration
