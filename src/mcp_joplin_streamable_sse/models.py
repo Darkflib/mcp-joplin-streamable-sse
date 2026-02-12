@@ -1,0 +1,41 @@
+"""Structured models returned by MCP tools."""
+
+from __future__ import annotations
+
+from typing import Any
+
+from pydantic import BaseModel, Field
+
+
+class PagedResult(BaseModel):
+    items: list[dict[str, Any]]
+    page: int = Field(ge=1)
+    limit: int = Field(ge=1, le=100)
+    has_more: bool
+    next_page: int | None
+
+
+class Note(BaseModel):
+    id: str
+    title: str | None = None
+    body: str | None = None
+    parent_id: str | None = None
+    created_time: int | None = None
+    updated_time: int | None = None
+
+
+class Folder(BaseModel):
+    id: str
+    title: str | None = None
+    parent_id: str | None = None
+
+
+class Tag(BaseModel):
+    id: str
+    title: str | None = None
+
+
+class FolderNode(BaseModel):
+    id: str
+    title: str | None = None
+    children: list[FolderNode] = Field(default_factory=list)
