@@ -1,0 +1,67 @@
+# AGENTS.md
+
+Guidance for coding agents working on this repository.
+
+## Project summary
+
+- Python package: `mcp_joplin_streamable_sse`
+- Purpose: Streamable HTTP MCP server for Joplin Data API
+- Entry point: `uv run mcp-joplin-streamable-sse`
+- Python target: 3.12+
+
+## Key files
+
+- `src/mcp_joplin_streamable_sse/asgi.py` - ASGI app, API-key middleware, routing
+- `src/mcp_joplin_streamable_sse/mcp_server.py` - MCP resources/tools registration
+- `src/mcp_joplin_streamable_sse/joplin_client.py` - async Joplin API client (JSON/bytes/multipart)
+- `src/mcp_joplin_streamable_sse/models.py` - response/data models
+- `src/mcp_joplin_streamable_sse/settings.py` - environment config
+
+## Exposed MCP surface (current)
+
+### Resources
+
+- `joplin-note://{note_id}`
+- `joplin-folders://tree`
+
+### Tools
+
+- Notes: `notes_get`, `notes_list`, `notes_create`, `notes_update`, `notes_delete`
+- Folders: `folders_list`, `folders_tree`, `folders_create`, `folders_update`, `folders_delete`
+- Tags: `tags_list`, `tags_create`, `tags_delete`, `tags_add_note`, `tags_remove_note`
+- Resources: `resources_list`, `resources_get`, `resources_get_content`, `resources_create`, `resources_delete`, `notes_list_resources`, `notes_attach_resource`, `notes_detach_resource`
+- Search: `search`
+
+## Environment variables
+
+Required:
+
+- `JOPLIN_TOKEN`
+- `MCP_API_KEY`
+
+Optional/defaulted:
+
+- `JOPLIN_BASE_URL` (default `http://127.0.0.1:41184`)
+- `MCP_HOST` (default `127.0.0.1`)
+- `MCP_PORT` (default `5005`)
+- `HTTP_TIMEOUT_SECONDS` (default `15.0`)
+
+## Local dev workflow
+
+1. `uv sync --all-extras`
+2. `uv run python -m pytest -q`
+3. Run server: `uv run mcp-joplin-streamable-sse`
+
+## Editing guidelines
+
+- Keep changes small and focused.
+- Preserve strict typing and existing style.
+- Add/adjust tests when behavior changes.
+- Keep README and this file in sync with exposed tools/resources.
+- Do not commit secrets (`.env` is ignored).
+
+## Behavior notes
+
+- `/health` is unauthenticated by design.
+- MCP endpoint requires `X-API-Key`.
+- Attachment content is exchanged as base64 in MCP tools.
