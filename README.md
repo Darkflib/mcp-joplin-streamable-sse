@@ -1,5 +1,11 @@
 # Joplin Remote MCP server for LLM integration
 
+> **This project has moved to [Darkflib/mcp-joplin](https://github.com/Darkflib/mcp-joplin)**
+> and is renamed `mcp-joplin` (command `mcp-joplin`, package `mcp_joplin`) from v0.2.0.
+> The full history moved with it. This repository is no longer updated. Existing
+> checkouts keep working, and the new version still accepts the old
+> `mcp-joplin-streamable-sse` command, so you can switch whenever convenient.
+
 This project provides a Streamable HTTP MCP server over the Joplin Data API (Web Clipper).
 It enables MCP clients (including coding agents/LLMs) to read and manage notes, folders,
 tags, search, and attachments.
